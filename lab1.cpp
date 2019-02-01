@@ -39,8 +39,10 @@ using namespace std;
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <GL/glx.h>
+#include "fonts.h"
 
-const int MAX_PARTICLES = 2000;
+const int MAX_PARTICLES = 20000;
+const int MAX_BOXES = 5;
 const float GRAVITY = -0.1;
 
 //some structures
@@ -63,17 +65,20 @@ struct Particle {
 class Global {
 public:
 	int xres, yres;
-	Shape box;
+	Shape box[MAX_BOXES];
 	Particle particle[MAX_PARTICLES];
 	int n;
+	bool flow = 0;
 	Global() {
 		xres = 800;
 		yres = 600;
 		//define a box shape
-		box.width = 100;
-		box.height = 10;
-		box.center.x = 120 + 5*65;
-		box.center.y = 500 - 5*60;
+		for (int i = 0; i < MAX_BOXES; i++) {
+			box[i].width = 100;
+			box[i].height = 10;
+			box[i].center.x = 120 + i*65;
+			box[i].center.y = 500 - i*60;
+		}
 		n = 0;
 	}
 } g;
@@ -142,6 +147,7 @@ void check_mouse(XEvent *e);
 int check_keys(XEvent *e);
 void movement();
 void render();
+void fountain();
 
 
 
@@ -161,10 +167,12 @@ int main()
 			check_mouse(&e);
 			done = check_keys(&e);
 		}
+		fountain();
 		movement();
 		render();
 		x11.swapBuffers();
 	}
+	cleanup_fonts();
 	return 0;
 }
 
@@ -179,13 +187,15 @@ void init_opengl(void)
 	glOrtho(0, g.xres, 0, g.yres, -1, 1);
 	//Set the screen background color
 	glClearColor(0.1, 0.1, 0.1, 1.0);
+	glEnable(GL_TEXTURE_2D);
+	initialize_fonts();
 }
 
 void makeParticle(int x, int y)
 {
 	if (g.n >= MAX_PARTICLES)
 		return;
-	cout << "makeParticle() " << x << " " << y << endl;
+	//cout << "makeParticle() " << x << " " << y << endl;
 	//position of particle
 	Particle *p = &g.particle[g.n];
 	p->s.center.x = x;
@@ -193,6 +203,19 @@ void makeParticle(int x, int y)
 	p->velocity.y = -4.0;
 	p->velocity.x =  1.0;
 	++g.n;
+}
+
+void fountain()
+{
+	int x = 150;
+	int y = 650;
+	int num;
+	if (g.flow) {
+		for (int i = 0; i < 10; i++) {
+			num = y + (rand() % 50);
+			makeParticle(x, num);
+		}
+	}
 }
 
 void check_mouse(XEvent *e)
@@ -228,10 +251,10 @@ void check_mouse(XEvent *e)
 			savex = e->xbutton.x;
 			savey = e->xbutton.y;
 		}
-		int y = g.yres - e->xbutton.y;
-		for (int i = 0; i < 10; ++i) {
-		    makeParticle(e->xbutton.x, y);
-		}
+	//	int y = g.yres - e->xbutton.y;
+	//	for (int i = 0; i < 10; ++i) {
+	//	    makeParticle(e->xbutton.x, y);
+	//	}
 	}
 }
 
@@ -246,7 +269,7 @@ int check_keys(XEvent *e)
 				//Key 1 was pressed
 				break;
 			case XK_a:
-				//Key A was pressed
+				g.flow ^= 1;
 				break;
 			case XK_Escape:
 				//Escape key was pressed
@@ -267,13 +290,15 @@ void movement()
 		p->velocity.y += GRAVITY;
 
 		//check for collision with shapes...
-		Shape *s = &g.box;
-		if (p->s.center.y < s->center.y + s->height &&
-			p->s.center.y > s->center.y - s->height &&
-			p->s.center.x > s->center.x - s->width &&
-			p->s.center.x < s->center.x + s->width) {
-	    	//bounce
-	    	p->velocity.y = -p->velocity.y;
+		for (int i = 0; i < MAX_BOXES; i++) {
+			Shape *s = &g.box[i];
+			if (p->s.center.y < s->center.y + s->height &&
+				p->s.center.y > s->center.y - s->height &&
+				p->s.center.x > s->center.x - s->width &&
+				p->s.center.x < s->center.x + s->width) {
+	    		//bounce
+	    		p->velocity.y = -p->velocity.y / 3;
+			}
 		}
 
 		//check for off-screen
@@ -286,30 +311,38 @@ void movement()
 
 void render()
 {
+	Rect r[MAX_BOXES];
 	glClear(GL_COLOR_BUFFER_BIT);
 	//Draw shapes...
 	//
 	//draw a box
-	Shape *s;
-	glColor3ub(90,140,90);
-	s = &g.box;
-	glPushMatrix();
-	glTranslatef(s->center.x, s->center.y, s->center.z);
 	float w, h;
-	w = s->width;
-	h = s->height;
-	glBegin(GL_QUADS);
-		glVertex2i(-w, -h);
-		glVertex2i(-w,  h);
-		glVertex2i( w,  h);
-		glVertex2i( w, -h);
-	glEnd();
-	glPopMatrix();
+	int col1 = 90;
+	int col2 = 140;
+	int col3 = 90;
+	for(int i = 0; i < MAX_BOXES; i++) {
+		Shape *s = &g.box[i];
+		glPushMatrix();
+		glColor3ub(col1,col2,col3);
+		glTranslatef(s->center.x, s->center.y, s->center.z);
+		w = s->width;
+		h = s->height;
+		glBegin(GL_QUADS);
+			glVertex2i(-w, -h);
+			glVertex2i(-w,  h);
+			glVertex2i( w,  h);
+			glVertex2i( w, -h);
+		glEnd();
+		glPopMatrix();
+		col1 += 20;
+		col2 += 20;
+		col3 += 20;
+	}
 	//
-	//Draw the particle here
-	glPushMatrix();
-	glColor3ub(150,160,220);
+	//Draw the particle here	
 	for (int i = 0; i < g.n; i++) {
+		glPushMatrix();
+		glColor3ub(150,160,220);
 		Vec *c = &g.particle[i].s.center;
 		w =
 		h = 2;
@@ -323,14 +356,21 @@ void render()
 	}
 	//
 	//Draw your 2D text here
+	unsigned int c = 0x00000000;
 
+	for (int i = 0; i < MAX_BOXES; i++) {
+		r[i].width = g.box[i].width;
+		r[i].height = g.box[i].height;
+		r[i].center = 10;
+		r[i].bot = g.box[i].center.y - 5;
+		r[i].left = g.box[i].center.x;
+		//r[i].bot = g.yres - 20;
+		//r[i].left = 10;
+	}
 
-
-
+	ggprint8b(&r[0], 16, c, "Requirements");
+	ggprint8b(&r[1], 16, c, "Design");
+	ggprint8b(&r[2], 16, c, "Implementation");
+	ggprint8b(&r[3], 16, c, "Verification");
+	ggprint8b(&r[4], 16, c, "Maintenance");
 }
-
-
-
-
-
-
