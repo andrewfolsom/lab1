@@ -40,10 +40,17 @@ using namespace std;
 #include <X11/keysym.h>
 #include <GL/glx.h>
 #include "fonts.h"
+#include <unistd.h>
 
 const int MAX_PARTICLES = 20000;
 const int MAX_BOXES = 5;
 const float GRAVITY = -0.1;
+
+//defined types
+typedef double Vec2[3];
+
+//marcros
+#define MakeVector(x, y, z, v) (v)[0]=(x),(v)[1]=(y),(v)[2]=(z)
 
 //some structures
 
@@ -62,10 +69,73 @@ struct Particle {
 	Vec velocity;
 };
 
+class Image {
+public:
+	int width, height;
+	unsigned char *data;
+	~Image() { delete [] data; }
+	Image(const char *fname) {
+		if (fname[0] == '\0')
+			return;
+		//printf("fname **%s**\n", fname);
+		int ppmFlag = 0;
+		char name[40];
+		strcpy(name, fname);
+		int slen = strlen(name);
+		char ppmname[80];
+		if (strncmp(name+(slen-4), ".ppm", 4) == 0)
+			ppmFlag = 1;
+		if (ppmFlag) {
+			strcpy(ppmname, name);
+		} else {
+			name[slen-4] = '\0';
+			//printf("name **%s**\n", name);
+			sprintf(ppmname,"%s.ppm", name);
+			//printf("ppmname **%s**\n", ppmname);
+			char ts[100];
+			//system("convert eball.jpg eball.ppm");
+			sprintf(ts, "convert %s %s", fname, ppmname);
+			system(ts);
+		}
+		//sprintf(ts, "%s", name);
+		FILE *fpi = fopen(ppmname, "r");
+		if (fpi) {
+			char line[200];
+			fgets(line, 200, fpi);
+			fgets(line, 200, fpi);
+			//skip comments and blank lines
+			while (line[0] == '#' || strlen(line) < 2)
+				fgets(line, 200, fpi);
+			sscanf(line, "%i %i", &width, &height);
+			fgets(line, 200, fpi);
+			//get pixel data
+			int n = width * height * 3;			
+			data = new unsigned char[n];			
+			for (int i=0; i<n; i++)
+				data[i] = fgetc(fpi);
+			fclose(fpi);
+		} else {
+			printf("ERROR opening image: %s\n",ppmname);
+			exit(0);
+		}
+		if (!ppmFlag)
+			unlink(ppmname);
+	}
+};
+Image img = "./images/bigfootSmall.png";
+
+class Bigfoot {
+public:
+	Vec2 pos;
+	Vec2 vel;
+} bigfoot;
+
 class Global {
 public:
 	int xres, yres;
+	GLuint bigfootTexture;
 	Shape box[MAX_BOXES];
+	Shape mouth;
 	Particle particle[MAX_PARTICLES];
 	int n;
 	bool flow = 0;
@@ -79,6 +149,11 @@ public:
 			box[i].center.x = 120 + i*65;
 			box[i].center.y = 500 - i*60;
 		}
+		//define mouth shape
+		mouth.width = 25;
+		mouth.height = 25;
+		mouth.center.x = 535;
+		mouth.center.y = 100;
 		n = 0;
 	}
 } g;
@@ -143,6 +218,7 @@ public:
 
 //Function prototypes
 void init_opengl(void);
+void init();
 void check_mouse(XEvent *e);
 int check_keys(XEvent *e);
 void movement();
@@ -158,6 +234,7 @@ int main()
 {
 	srand(time(NULL));
 	init_opengl();
+	init();
 	//Main animation loop
 	int done = 0;
 	while (!done) {
@@ -176,6 +253,47 @@ int main()
 	return 0;
 }
 
+void init() {
+	MakeVector(145.0, -300.0, 0.0, bigfoot.pos);
+	MakeVector(0.0, 0.0, 0.0, bigfoot.vel);
+}
+
+unsigned char *buildAlphaData(Image *img)
+{
+	//add 4th component to RGB stream...
+	int i;
+	int a,b,c;
+	unsigned char *newdata, *ptr;
+	unsigned char *data = (unsigned char *)img->data;
+	newdata = (unsigned char *)malloc(img->width * img->height * 4);
+	ptr = newdata;
+	for (i=0; i<img->width * img->height * 3; i+=3) {
+		a = *(data+0);
+		b = *(data+1);
+		c = *(data+2);
+		*(ptr+0) = a;
+		*(ptr+1) = b;
+		*(ptr+2) = c;
+		//-----------------------------------------------
+		//get largest color component...
+		//*(ptr+3) = (unsigned char)((
+		//		(int)*(ptr+0) +
+		//		(int)*(ptr+1) +
+		//		(int)*(ptr+2)) / 3);
+		//d = a;
+		//if (b >= a && b >= c) d = b;
+		//if (c >= a && c >= b) d = c;
+		//*(ptr+3) = d;
+		//-----------------------------------------------
+		//this code optimizes the commented code above.
+		*(ptr+3) = (a|b|c);
+		//-----------------------------------------------
+		ptr += 4;
+		data += 3;
+	}
+	return newdata;
+}
+
 void init_opengl(void)
 {
 	//OpenGL initialization
@@ -188,6 +306,19 @@ void init_opengl(void)
 	//Set the screen background color
 	glClearColor(0.1, 0.1, 0.1, 1.0);
 	glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &g.bigfootTexture);
+
+	// Adding Bigfoot
+	int w = img.width;
+	int h = img.height;
+	unsigned char *ftData = buildAlphaData(&img);
+	glBindTexture(GL_TEXTURE_2D, g.bigfootTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, ftData);
+	free(ftData);
+
 	initialize_fonts();
 }
 
@@ -195,7 +326,7 @@ void makeParticle(int x, int y)
 {
 	if (g.n >= MAX_PARTICLES)
 		return;
-	//cout << "makeParticle() " << x << " " << y << endl;
+	cout << "makeParticle() " << x << " " << y << endl;
 	//position of particle
 	Particle *p = &g.particle[g.n];
 	p->s.center.x = x;
@@ -251,10 +382,10 @@ void check_mouse(XEvent *e)
 			savex = e->xbutton.x;
 			savey = e->xbutton.y;
 		}
-	//	int y = g.yres - e->xbutton.y;
-	//	for (int i = 0; i < 10; ++i) {
-	//	    makeParticle(e->xbutton.x, y);
-	//	}
+		int y = g.yres - e->xbutton.y;
+		for (int i = 0; i < 10; ++i) {
+		    makeParticle(e->xbutton.x, y);
+		}
 	}
 }
 
@@ -301,6 +432,8 @@ void movement()
 			}
 		}
 
+		//check for collision with mouth
+
 		//check for off-screen
 		if (p->s.center.y < 0.0) {
 			//cout << "off screen" << endl;
@@ -313,6 +446,8 @@ void render()
 {
 	Rect r[MAX_BOXES];
 	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
 	//Draw shapes...
 	//
 	//draw a box
@@ -354,6 +489,25 @@ void render()
 		glEnd();
 		glPopMatrix();
 	}
+
+	//Bigfoot
+	glPushMatrix();
+	glTranslatef(bigfoot.pos[0], bigfoot.pos[1], bigfoot.pos[2]);
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.0f);
+	glColor4ub(255,255,255,255);
+	glBindTexture(GL_TEXTURE_2D, g.bigfootTexture);
+	glBegin(GL_QUADS);
+		glTexCoord2f(1.0f, 1.0f); glVertex2i(0, 0);
+		glTexCoord2f(1.0f, 0.0f); glVertex2i(0, g.yres);
+		glTexCoord2f(0.0f, 0.0f); glVertex2i(g.xres, g.yres);
+		glTexCoord2f(0.0f, 1.0f); glVertex2i(g.xres, 0);
+	glEnd();
+	glDisable(GL_ALPHA_TEST);
+	glPopMatrix();
+	//glDisable(GL_TEXTURE_2D);
+	glDisable(GL_DEPTH_TEST);
+
 	//
 	//Draw your 2D text here
 	unsigned int c = 0x00000000;
@@ -373,4 +527,5 @@ void render()
 	ggprint8b(&r[2], 16, c, "Implementation");
 	ggprint8b(&r[3], 16, c, "Verification");
 	ggprint8b(&r[4], 16, c, "Maintenance");
+
 }
