@@ -150,8 +150,8 @@ public:
 			box[i].center.y = 500 - i*60;
 		}
 		//define mouth shape
-		mouth.width = 25;
-		mouth.height = 25;
+		mouth.width = 10;
+		mouth.height = 10;
 		mouth.center.x = 535;
 		mouth.center.y = 100;
 		n = 0;
@@ -433,6 +433,15 @@ void movement()
 		}
 
 		//check for collision with mouth
+        for (int i = 0; i < MAX_BOXES; i++) {
+            Shape *m = &g.mouth;
+            if(p->s.center.y < m->center.y + m->height &&
+               p->s.center.y > m->center.y - m->height &&
+               p->s.center.x > m->center.x - m->width &&
+               p->s.center.x < m->center.x + m->width) {
+                g.particle[i] = g.particle[--g.n];
+            }
+        }
 
 		//check for off-screen
 		if (p->s.center.y < 0.0) {
@@ -473,6 +482,25 @@ void render()
 		col2 += 20;
 		col3 += 20;
 	}
+
+    //draw mouth box
+    Shape *m = &g.mouth;
+    glPushMatrix();
+    glEnable(GL_ALPHA_TEST);
+	//glAlphaFunc(GL_GREATER, 0.0f);
+    glColor4ub(255,255,255,0);
+    glTranslatef(m->center.x, m->center.y, m->center.z);
+    w = m->width;
+    h = m->height;
+    glBegin(GL_QUADS);
+        glVertex2i(-w, -h);
+        glVertex2i(-w, h);
+        glVertex2i(w, h);
+        glVertex2i(w, -h);
+    glEnd();
+    glDisable(GL_ALPHA_TEST);
+    glPopMatrix();
+
 	//
 	//Draw the particle here	
 	for (int i = 0; i < g.n; i++) {
