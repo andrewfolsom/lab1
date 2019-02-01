@@ -139,6 +139,7 @@ public:
 	Particle particle[MAX_PARTICLES];
 	int n;
 	bool flow = 0;
+	bool show = 0;
 	Global() {
 		xres = 800;
 		yres = 600;
@@ -152,8 +153,8 @@ public:
 		//define mouth shape
 		mouth.width = 10;
 		mouth.height = 10;
-		mouth.center.x = 535;
-		mouth.center.y = 100;
+		mouth.center.x = 540;
+		mouth.center.y = 95;
 		n = 0;
 	}
 } g;
@@ -225,8 +226,6 @@ void movement();
 void render();
 void fountain();
 
-
-
 //=====================================
 // MAIN FUNCTION IS HERE
 //=====================================
@@ -255,7 +254,7 @@ int main()
 
 void init() {
 	MakeVector(145.0, -300.0, 0.0, bigfoot.pos);
-	MakeVector(0.0, 0.0, 0.0, bigfoot.vel);
+	MakeVector(0.0, 10.0, 0.0, bigfoot.vel);
 }
 
 unsigned char *buildAlphaData(Image *img)
@@ -326,7 +325,7 @@ void makeParticle(int x, int y)
 {
 	if (g.n >= MAX_PARTICLES)
 		return;
-	cout << "makeParticle() " << x << " " << y << endl;
+	//cout << "makeParticle() " << x << " " << y << endl;
 	//position of particle
 	Particle *p = &g.particle[g.n];
 	p->s.center.x = x;
@@ -396,10 +395,10 @@ int check_keys(XEvent *e)
 	int key = XLookupKeysym(&e->xkey, 0);
 	if (e->type == KeyPress) {
 		switch (key) {
-			case XK_1:
+			case XK_b:
 				//Key 1 was pressed
 				break;
-			case XK_a:
+			case XK_f:
 				g.flow ^= 1;
 				break;
 			case XK_Escape:
@@ -439,7 +438,7 @@ void movement()
                p->s.center.y > m->center.y - m->height &&
                p->s.center.x > m->center.x - m->width &&
                p->s.center.x < m->center.x + m->width) {
-                g.particle[i] = g.particle[--g.n];
+		p->s.center.y = -5.0;	
             }
         }
 
