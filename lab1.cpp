@@ -1,4 +1,3 @@
-//
 //modified by: Andrew Folsom
 //date: 1/24/2019
 //
@@ -381,10 +380,10 @@ void check_mouse(XEvent *e)
 			savex = e->xbutton.x;
 			savey = e->xbutton.y;
 		}
-		int y = g.yres - e->xbutton.y;
-		for (int i = 0; i < 10; ++i) {
-		    makeParticle(e->xbutton.x, y);
-		}
+		//int y = g.yres - e->xbutton.y;
+		//for (int i = 0; i < 10; ++i) {
+		//    makeParticle(e->xbutton.x, y);
+		//}
 	}
 }
 
@@ -452,9 +451,8 @@ void movement()
 
 void render()
 {
-	Rect r[MAX_BOXES];
-	glClear(GL_COLOR_BUFFER_BIT);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	Rect r[MAX_BOXES + 1];
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 	//Draw shapes...
 	//
@@ -482,24 +480,24 @@ void render()
 		col3 += 20;
 	}
 
-    //draw mouth box
-    Shape *m = &g.mouth;
-    glPushMatrix();
-    glEnable(GL_ALPHA_TEST);
+    	//draw mouth box
+    	Shape *m = &g.mouth;
+    	glPushMatrix();
+    	glEnable(GL_ALPHA_TEST);
 	//glAlphaFunc(GL_GREATER, 0.0f);
-    glColor4ub(255,255,255,0);
-    glTranslatef(m->center.x, m->center.y, m->center.z);
-    w = m->width;
-    h = m->height;
-    glBegin(GL_QUADS);
-        glVertex2i(-w, -h);
-        glVertex2i(-w, h);
-        glVertex2i(w, h);
-        glVertex2i(w, -h);
-    glEnd();
-    glDisable(GL_ALPHA_TEST);
-    glPopMatrix();
-
+    	glColor4ub(255,255,255,0);
+    	glTranslatef(m->center.x, m->center.y, m->center.z);
+    	w = m->width;
+    	h = m->height;
+    	glBegin(GL_QUADS);
+    	    glVertex2i(-w, -h);
+    	    glVertex2i(-w, h);
+    	    glVertex2i(w, h);
+    	    glVertex2i(w, -h);
+    	glEnd();
+    	glDisable(GL_ALPHA_TEST);
+    	glPopMatrix();
+	
 	//
 	//Draw the particle here	
 	for (int i = 0; i < g.n; i++) {
@@ -538,6 +536,13 @@ void render()
 	//
 	//Draw your 2D text here
 	unsigned int c = 0x00000000;
+	unsigned int c2 = 0x00ff5050;
+
+	r[5].width = g.box[0].width * 10;
+	r[5].height = g.box[0].height * 10;
+	r[5].left = 10;
+	r[5].center = 0;
+	r[5].bot = 10;
 
 	for (int i = 0; i < MAX_BOXES; i++) {
 		r[i].width = g.box[i].width;
@@ -554,5 +559,6 @@ void render()
 	ggprint8b(&r[2], 16, c, "Implementation");
 	ggprint8b(&r[3], 16, c, "Verification");
 	ggprint8b(&r[4], 16, c, "Maintenance");
+	ggprint16(&r[5], 16, c2, "Bigfoot is thirsty! Help him by pressing f");
 
 }
