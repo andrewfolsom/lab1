@@ -556,8 +556,8 @@ void render()
 
 	ggprint8b(&r[0], 16, c, "Requirements");
 	ggprint8b(&r[1], 16, c, "Design");
-	ggprint8b(&r[2], 16, c, "Implementation");
-	ggprint8b(&r[3], 16, c, "Verification");
+	ggprint8b(&r[2], 16, c, "Coding");
+	ggprint8b(&r[3], 16, c, "Testing");
 	ggprint8b(&r[4], 16, c, "Maintenance");
 	ggprint16(&r[5], 16, c2, "Bigfoot is thirsty! Help him by pressing f");
 
